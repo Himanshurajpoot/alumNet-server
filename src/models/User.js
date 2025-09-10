@@ -6,11 +6,19 @@ const userSchema = new mongoose.Schema(
 		name: { type: String, required: true, trim: true },
 		email: { type: String, required: true, unique: true, lowercase: true, index: true },
 		password: { type: String, required: true, select: false },
-		role: { type: String, enum: ['alumni', 'student', 'admin'], default: 'alumni' },
+		role: { type: String, enum: ['alumni', 'student', 'admin'], default: 'student' },
 		bio: { type: String, default: '' },
 		graduationYear: { type: Number },
 		department: { type: String },
 		avatarUrl: { type: String },
+		// Alumni-specific profile fields
+		batch: { type: Number },
+		course: { type: String },
+		currentJob: { type: String },
+		// Verification for alumni
+		verified: { type: Boolean, default: false },
+		// Moderation/state
+		isActive: { type: Boolean, default: true },
 	},
 	{ timestamps: true }
 );

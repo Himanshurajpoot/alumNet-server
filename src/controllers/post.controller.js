@@ -5,20 +5,41 @@ import { validationResult } from 'express-validator';
 export const createPost = asyncHandler(async (req, res) => {
 	const errors = validationResult(req);
 	if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+	// Only alumni (verified) and admins can create posts
+	if (req.user.role === 'student') {
+		return res.status(403).json({ message: 'Only alumni and admins can create posts' });
+	}
+	if (req.user.role === 'alumni' && !req.user.verified) {
+		return res.status(403).json({ message: 'Your alumni account must be verified to post' });
+	}
+
 	const { title, content } = req.body;
-	const post = await Post.create({ author: req.user._id, title, content });
+	const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
+	const post = await Post.create({ author: req.user._id, title, content, imageUrl });
 	res.status(201).json(post);
 });
 
 export const listPosts = asyncHandler(async (_req, res) => {
-	const posts = await Post.find().populate('author', 'name role').sort({ createdAt: -1 });
-	res.json(posts);
+	const posts = await Post.find()
+		.populate('author', 'name role')
+		.sort({ createdAt: -1 });
+	const withCounts = posts.map((p) => {
+		const obj = p.toObject();
+		obj.likesCount = p.likes?.length || 0;
+		obj.commentsCount = p.comments?.length || 0;
+		return obj;
+	});
+	res.json(withCounts);
 });
 
 export const getPost = asyncHandler(async (req, res) => {
 	const post = await Post.findById(req.params.id).populate('author', 'name role');
 	if (!post) return res.status(404).json({ message: 'Post not found' });
-	res.json(post);
+	const obj = post.toObject();
+	obj.likesCount = post.likes?.length || 0;
+	obj.commentsCount = post.comments?.length || 0;
+	res.json(obj);
 });
 
 export const updatePost = asyncHandler(async (req, res) => {
@@ -31,6 +52,7 @@ export const updatePost = asyncHandler(async (req, res) => {
 	const { title, content } = req.body;
 	if (title !== undefined) post.title = title;
 	if (content !== undefined) post.content = content;
+	if (req.file) post.imageUrl = `/uploads/${req.file.filename}`;
 	await post.save();
 	res.json(post);
 });
@@ -50,9 +72,14 @@ export const likePost = asyncHandler(async (req, res) => {
 	const post = await Post.findById(req.params.id);
 	if (!post) return res.status(404).json({ message: 'Post not found' });
 	const userId = req.user._id;
-	if (!post.likes.includes(userId)) post.likes.push(userId);
-	await post.save();
-	res.json({ likes: post.likes.length });
+	const alreadyLiked = post.likes.some((id) => id.toString() === userId.toString());
+	if (alreadyLiked) {
+		await Post.updateOne({ _id: post._id }, { $pull: { likes: userId } });
+	} else {
+		await Post.updateOne({ _id: post._id }, { $addToSet: { likes: userId } });
+	}
+	const updated = await Post.findById(post._id).select('likes');
+	res.json({ liked: !alreadyLiked, likes: updated.likes.length });
 });
 
 export const commentOnPost = asyncHandler(async (req, res) => {

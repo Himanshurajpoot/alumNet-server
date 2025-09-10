@@ -5,15 +5,57 @@ import { signJwt } from '../middleware/auth.js';
 import bcrypt from 'bcryptjs';
 
 export const register = asyncHandler(async (req, res) => {
-	console.log("i ma register")
-	console.log(req.body);
-	
-	// const errors = validationResult(req);
-	// if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-	const { name, email, password, role, bio, graduationYear, department } = req.body;
+	const errors = validationResult(req);
+	console.log("hello")
+	if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+	const { name, email, password } = req.body;
+	const requestedRole = (req.body.role || 'student').toLowerCase();
+	const bio = req.body.bio;
+	const graduationYear = req.body.graduationYear;
+	const department = req.body.department;
+	const batch = req.body.batch;
+	const course = req.body.course;
+	const currentJob = req.body.currentJob;
+
+	const domain = process.env.COLLEGE_EMAIL_DOMAIN || 'college.edu';
+	if (!email.endsWith(`@${domain}`)) {
+		return res.status(400).json({ message: `Registration requires a college email (@${domain})` });
+	}
+
+	if (requestedRole === 'admin') {
+		return res.status(400).json({ message: 'Admin accounts cannot be self-registered' });
+	}
+
 	const existing = await User.findOne({ email });
 	if (existing) return res.status(409).json({ message: 'Email already in use' });
-	const user = await User.create({ name, email, password, role, bio, graduationYear, department });
+
+	let finalRole = 'student';
+	const createDoc = { name, email, password };
+
+	if (requestedRole === 'alumni') {
+		// Alumni must provide additional fields
+		if (!batch || !course || !currentJob) {
+			return res.status(400).json({ message: 'Alumni must provide batch, course, and currentJob' });
+		}
+		finalRole = 'alumni';
+		createDoc.role = finalRole;
+		createDoc.batch = batch;
+		createDoc.course = course;
+		createDoc.currentJob = currentJob;
+		if (bio) createDoc.bio = bio;
+		if (graduationYear) createDoc.graduationYear = graduationYear;
+		if (department) createDoc.department = department;
+		createDoc.verified = false; // requires admin verification
+	} else {
+		// Student registration: ignore alumni-only fields
+		finalRole = 'student';
+		createDoc.role = finalRole;
+		if (bio) createDoc.bio = bio;
+		if (graduationYear) createDoc.graduationYear = graduationYear;
+		if (department) createDoc.department = department;
+	}
+
+	const user = await User.create(createDoc);
 	const token = signJwt({ sub: user._id, role: user.role });
 	const safe = { id: user._id, name: user.name, email: user.email, role: user.role };
 	res.status(201).json({ user: safe, token });
@@ -34,4 +76,25 @@ export const login = asyncHandler(async (req, res) => {
 
 export const me = asyncHandler(async (req, res) => {
 	res.json({ user: req.user });
+});
+
+export const updateMe = asyncHandler(async (req, res) => {
+	const user = await User.findById(req.user._id);
+	if (!user) return res.status(404).json({ message: 'User not found' });
+
+	// Students: cannot edit alumni-only fields
+	// Alumni: can edit their own profile fields (not role, email, verified)
+	const forbiddenForAll = ['role', 'email', 'password', 'verified', 'isActive'];
+	for (const key of forbiddenForAll) delete req.body[key];
+
+	if (req.user.role === 'student') {
+		delete req.body.currentJob;
+		delete req.body.course;
+		delete req.body.batch;
+	}
+
+	Object.assign(user, req.body);
+	await user.save();
+	const safe = { id: user._id, name: user.name, email: user.email, role: user.role };
+	res.json({ user: safe });
 });
