@@ -10,7 +10,7 @@ export const listUsers = asyncHandler(async (req, res) => {
 		{ name: new RegExp(q, 'i') },
 		{ email: new RegExp(q, 'i') },
 	];
-	const users = await User.find(filter).select('-password');
+	const users = await User.find(filter).select('-password').lean();
 	res.json({ users });
 });
 

@@ -14,7 +14,9 @@ import { notFoundHandler, errorHandler } from './middleware/error.js';
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({
+	crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(cors({
 	origin: process.env.CLIENT_ORIGIN?.split(',') || '*',
 	credentials: true,
@@ -27,6 +29,7 @@ app.use(cookieParser());
 app.use(morgan('dev'));
 
 // Static for uploads
+
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'AlumniConnect API' }));

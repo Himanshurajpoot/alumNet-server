@@ -10,7 +10,6 @@ export const register = asyncHandler(async (req, res) => {
 	if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 	const { name, email, password } = req.body;
 	const requestedRole = (req.body.role || 'student').toLowerCase();
-	const bio = req.body.bio;
 	const graduationYear = req.body.graduationYear;
 	const department = req.body.department;
 	const batch = req.body.batch;
@@ -33,24 +32,22 @@ export const register = asyncHandler(async (req, res) => {
 	const createDoc = { name, email, password };
 
 	if (requestedRole === 'alumni') {
-		// Alumni must provide additional fields
-		if (!batch || !course || !currentJob) {
-			return res.status(400).json({ message: 'Alumni must provide batch, course, and currentJob' });
+		// Alumni must provide additional fields (job optional)
+		if (!batch || !course) {
+			return res.status(400).json({ message: 'Alumni must provide batch and course' });
 		}
 		finalRole = 'alumni';
 		createDoc.role = finalRole;
 		createDoc.batch = batch;
 		createDoc.course = course;
-		createDoc.currentJob = currentJob;
-		if (bio) createDoc.bio = bio;
+		if (currentJob) createDoc.currentJob = currentJob;
 		if (graduationYear) createDoc.graduationYear = graduationYear;
 		if (department) createDoc.department = department;
-		createDoc.verified = false; // requires admin verification
+		createDoc.verified = true; // requires admin verification
 	} else {
 		// Student registration: ignore alumni-only fields
 		finalRole = 'student';
 		createDoc.role = finalRole;
-		if (bio) createDoc.bio = bio;
 		if (graduationYear) createDoc.graduationYear = graduationYear;
 		if (department) createDoc.department = department;
 	}
@@ -67,6 +64,7 @@ export const login = asyncHandler(async (req, res) => {
 	const { email, password } = req.body;
 	const user = await User.findOne({ email }).select('+password');
 	if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+	if (user.isActive === false) return res.status(403).json({ message: 'Account is inactive. Contact admin.' });
 	const match = await bcrypt.compare(password, user.password);
 	if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 	const token = signJwt({ sub: user._id, role: user.role });

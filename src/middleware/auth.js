@@ -15,6 +15,7 @@ export async function requireAuth(req, res, next) {
 		const decoded = jwt.verify(token, process.env.JWT_SECRET);
 		const user = await User.findById(decoded.sub).select('-password');
 		if (!user) return res.status(401).json({ message: 'Unauthorized' });
+		if (user.isActive === false) return res.status(403).json({ message: 'Account is inactive. Contact admin.' });
 		req.user = user;
 		next();
 	} catch (err) {

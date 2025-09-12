@@ -7,7 +7,6 @@ const userSchema = new mongoose.Schema(
 		email: { type: String, required: true, unique: true, lowercase: true, index: true },
 		password: { type: String, required: true, select: false },
 		role: { type: String, enum: ['alumni', 'student', 'admin'], default: 'student' },
-		bio: { type: String, default: '' },
 		graduationYear: { type: Number },
 		department: { type: String },
 		avatarUrl: { type: String },
@@ -16,12 +15,16 @@ const userSchema = new mongoose.Schema(
 		course: { type: String },
 		currentJob: { type: String },
 		// Verification for alumni
-		verified: { type: Boolean, default: false },
+		verified: { type: Boolean, default: true },
 		// Moderation/state
 		isActive: { type: Boolean, default: true },
 	},
 	{ timestamps: true }
 );
+
+// Secondary indexes for common queries
+userSchema.index({ role: 1 });
+userSchema.index({ verified: 1 });
 
 
 

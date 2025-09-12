@@ -10,6 +10,7 @@ router.put('/me', requireAuth, updateMyProfile);
 router.post('/me/avatar', requireAuth, upload.single('avatar'), uploadAvatar);
 router.get('/:id', getPublicProfileById);
 
+
 export default router;
 
 
