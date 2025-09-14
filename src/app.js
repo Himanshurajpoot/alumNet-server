@@ -36,19 +36,50 @@ const authLimiter = rateLimit({
 app.use(limiter);
 app.use('/api/auth', authLimiter);
 
+// CORS must be configured before other middleware
+app.use(cors({
+	origin: function (origin, callback) {
+		// Allow requests with no origin (like mobile apps or curl requests)
+		if (!origin) return callback(null, true);
+		
+		const allowedOrigins = process.env.CLIENT_ORIGIN?.split(',') || ['http://localhost:3000'];
+		if (allowedOrigins.includes(origin)) {
+			return callback(null, true);
+		}
+		
+		// For development, allow localhost on any port
+		if (process.env.NODE_ENV !== 'production' && origin.includes('localhost')) {
+			return callback(null, true);
+		}
+		
+		return callback(new Error('Not allowed by CORS'));
+	},
+	credentials: true,
+	methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+	allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+	exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
+	optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+}));
+
+// Handle preflight requests
+app.options('*', cors());
+
 app.use(helmet({
 	crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
-app.use(cors({
-	origin: process.env.CLIENT_ORIGIN?.split(',') || '*',
-	credentials: true,
-	methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-	allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-}));
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(mongoSanitize());
+
+// Move mongoSanitize after body parsing but before routes
+app.use(mongoSanitize({
+	replaceWith: '_',
+	onSanitize: ({ req, key }) => {
+		console.warn(`This request[${key}] is sanitized`, req[key]);
+	},
+}));
+
 app.use(morgan('dev'));
 
 // Static for uploads
@@ -56,6 +87,15 @@ app.use(morgan('dev'));
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'AlumniConnect API' }));
+
+// CORS test endpoint
+app.get('/api/cors-test', (_req, res) => {
+	res.json({ 
+		message: 'CORS is working!', 
+		timestamp: new Date().toISOString(),
+		origin: _req.headers.origin || 'No origin header'
+	});
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
