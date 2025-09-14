@@ -9,7 +9,7 @@ const router = Router();
 router.get('/', listPosts);
 router.get('/:id', getPost);
 router.post('/', requireAuth, upload.single('image'), createPostValidator, createPost);
-router.patch('/:id', requireAuth, upload.single('image'), updatePost);
+router.patch('/:id', requireAuth, upload.single('image'), createPostValidator, updatePost);
 router.delete('/:id', requireAuth, deletePost);
 router.post('/:id/like', requireAuth, likePost);
 router.post('/:id/comment', requireAuth, commentValidator, commentOnPost);

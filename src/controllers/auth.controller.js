@@ -3,10 +3,10 @@ import { validationResult } from 'express-validator';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { signJwt } from '../middleware/auth.js';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 export const register = asyncHandler(async (req, res) => {
 	const errors = validationResult(req);
-	console.log("hello")
 	if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 	const { name, email, password } = req.body;
 	const requestedRole = (req.body.role || 'student').toLowerCase();
@@ -68,7 +68,7 @@ export const login = asyncHandler(async (req, res) => {
 	const match = await bcrypt.compare(password, user.password);
 	if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 	const token = signJwt({ sub: user._id, role: user.role });
-	const safe = { id: user._id, name: user.name, email: user.email, role: user.role };
+	const safe = { id: user._id, name: user.name, email: user.email, role: user.role , avatarUrl: user.avatarUrl};
 	res.json({ user: safe, token });
 });
 
@@ -95,4 +95,49 @@ export const updateMe = asyncHandler(async (req, res) => {
 	await user.save();
 	const safe = { id: user._id, name: user.name, email: user.email, role: user.role };
 	res.json({ user: safe });
+});
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+	const { email } = req.body;
+	const user = await User.findOne({ email });
+	
+	if (!user) {
+		// Don't reveal if email exists or not for security
+		return res.json({ message: 'If the email exists, a password reset link has been sent.' });
+	}
+
+	const resetToken = user.generatePasswordResetToken();
+	await user.save({ validateBeforeSave: false });
+
+	// In a real application, you would send an email here
+	// For now, we'll just return the token (remove this in production)
+	res.json({ 
+		message: 'Password reset token generated',
+		resetToken: resetToken // Remove this in production
+	});
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+	const { token, password } = req.body;
+	
+	if (!token || !password) {
+		return res.status(400).json({ message: 'Token and password are required' });
+	}
+
+	const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+	const user = await User.findOne({
+		resetPasswordToken: hashedToken,
+		resetPasswordExpires: { $gt: Date.now() }
+	});
+
+	if (!user) {
+		return res.status(400).json({ message: 'Token is invalid or has expired' });
+	}
+
+	user.password = password;
+	user.resetPasswordToken = undefined;
+	user.resetPasswordExpires = undefined;
+	await user.save();
+
+	res.json({ message: 'Password has been reset successfully' });
 });

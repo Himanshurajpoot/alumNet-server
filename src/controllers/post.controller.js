@@ -20,17 +20,47 @@ export const createPost = asyncHandler(async (req, res) => {
 	res.status(201).json(post);
 });
 
-export const listPosts = asyncHandler(async (_req, res) => {
-	const posts = await Post.find()
+export const listPosts = asyncHandler(async (req, res) => {
+	const page = parseInt(req.query.page) || 1;
+	const limit = parseInt(req.query.limit) || 10;
+	const skip = (page - 1) * limit;
+	const search = req.query.search;
+
+	let query = {};
+	if (search) {
+		query = {
+			$or: [
+				{ title: new RegExp(search, 'i') },
+				{ content: new RegExp(search, 'i') }
+			]
+		};
+	}
+
+	const posts = await Post.find(query)
 		.populate('author', 'name role')
-		.sort({ createdAt: -1 });
+		.sort({ createdAt: -1 })
+		.skip(skip)
+		.limit(limit);
+
+	const total = await Post.countDocuments(query);
 	const withCounts = posts.map((p) => {
 		const obj = p.toObject();
 		obj.likesCount = p.likes?.length || 0;
 		obj.commentsCount = p.comments?.length || 0;
 		return obj;
 	});
-	res.json(withCounts);
+
+	res.json({
+		posts: withCounts,
+		pagination: {
+			currentPage: page,
+			totalPages: Math.ceil(total / limit),
+			totalPosts: total,
+			hasNext: page < Math.ceil(total / limit),
+			hasPrev: page > 1
+		},
+		search: search || null
+	});
 });
 
 export const getPost = asyncHandler(async (req, res) => {
@@ -43,6 +73,9 @@ export const getPost = asyncHandler(async (req, res) => {
 });
 
 export const updatePost = asyncHandler(async (req, res) => {
+	const errors = validationResult(req);
+	if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
 	const { id } = req.params;
 	const post = await Post.findById(id);
 	if (!post) return res.status(404).json({ message: 'Post not found' });

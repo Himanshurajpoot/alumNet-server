@@ -8,7 +8,7 @@ const router = Router();
 router.get('/', listEvents);
 router.get('/:id', getEvent);
 router.post('/', requireAuth, createEventValidator, createEvent);
-router.patch('/:id', requireAuth, updateEvent);
+router.patch('/:id', requireAuth, createEventValidator, updateEvent);
 router.delete('/:id', requireAuth, deleteEvent);
 router.post('/:id/attend', requireAuth, attendEvent);
 router.post('/:id/leave', requireAuth, leaveEvent);

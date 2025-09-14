@@ -10,9 +10,29 @@ export const createEvent = asyncHandler(async (req, res) => {
 	res.status(201).json(event);
 });
 
-export const listEvents = asyncHandler(async (_req, res) => {
-	const events = await Event.find().populate('organizer', 'name').sort({ date: 1 });
-	res.json(events);
+export const listEvents = asyncHandler(async (req, res) => {
+	const page = parseInt(req.query.page) || 1;
+	const limit = parseInt(req.query.limit) || 10;
+	const skip = (page - 1) * limit;
+
+	const events = await Event.find()
+		.populate('organizer', 'name')
+		.sort({ date: 1 })
+		.skip(skip)
+		.limit(limit);
+
+	const total = await Event.countDocuments();
+
+	res.json({
+		events,
+		pagination: {
+			currentPage: page,
+			totalPages: Math.ceil(total / limit),
+			totalEvents: total,
+			hasNext: page < Math.ceil(total / limit),
+			hasPrev: page > 1
+		}
+	});
 });
 
 export const getEvent = asyncHandler(async (req, res) => {
@@ -22,6 +42,9 @@ export const getEvent = asyncHandler(async (req, res) => {
 });
 
 export const updateEvent = asyncHandler(async (req, res) => {
+	const errors = validationResult(req);
+	if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
 	const event = await Event.findById(req.params.id);
 	if (!event) return res.status(404).json({ message: 'Event not found' });
 	if (event.organizer.toString() !== req.user._id.toString() && req.user.role !== 'admin') {

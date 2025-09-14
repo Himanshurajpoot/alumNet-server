@@ -56,6 +56,7 @@ PORT=4000
 MONGO_URI=mongodb://localhost:27017/alumni_connect
 JWT_SECRET=replace-with-strong-secret
 CLIENT_ORIGIN=http://localhost:3000
+COLLEGE_EMAIL_DOMAIN=college.edu
 ```
 
 3) Run the server (dev)
@@ -69,25 +70,37 @@ Server will start at `http://localhost:${PORT}` and expose `GET /health`.
 - POST `/api/auth/register` { name, email, password, role?, graduationYear?, department? }
 - POST `/api/auth/login` { email, password }
 - GET `/api/auth/me` (Bearer token)
+- PUT `/api/auth/me` (Bearer token) { name?, graduationYear?, department?, batch?, course?, currentJob? }
+- POST `/api/auth/forgot-password` { email }
+- POST `/api/auth/reset-password` { token, password }
 
 ## Posts Endpoints
-- GET `/api/posts`
+- GET `/api/posts?page=1&limit=10&search=query` (supports pagination and search)
 - GET `/api/posts/:id`
-- POST `/api/posts` (auth) { title, content }
-- PATCH `/api/posts/:id` (auth)
+- POST `/api/posts` (auth) { title, content, image? }
+- PATCH `/api/posts/:id` (auth) { title?, content?, image? }
 - DELETE `/api/posts/:id` (auth)
 - POST `/api/posts/:id/like` (auth)
 - POST `/api/posts/:id/comment` (auth) { text }
 
 ## Events Endpoints
-- GET `/api/events`
+- GET `/api/events?page=1&limit=10` (supports pagination)
 - GET `/api/events/:id`
 - POST `/api/events` (auth) { title, date, location, description? }
-- PATCH `/api/events/:id` (auth)
+- PATCH `/api/events/:id` (auth) { title?, date?, location?, description? }
 - DELETE `/api/events/:id` (auth)
 - POST `/api/events/:id/attend` (auth)
 - POST `/api/events/:id/leave` (auth)
 
+## Security Features
+- Rate limiting: 100 requests per 15 minutes (general), 5 requests per 15 minutes (auth endpoints)
+- Input sanitization to prevent NoSQL injection attacks
+- Enhanced file upload validation (MIME type + extension checking)
+- Password reset functionality with secure token generation
+- JWT-based authentication with role-based access control
+
 ## Notes
 - Auth uses Bearer token in `Authorization` header; cookies also supported via `token` if you choose to set it.
 - Update `CLIENT_ORIGIN` to your frontend origin(s), comma-separated for multiple.
+- Password reset tokens expire after 10 minutes.
+- File uploads are limited to 2MB and only image files (PNG, JPEG, GIF, WebP).
