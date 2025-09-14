@@ -61,8 +61,17 @@ app.use(cors({
 	optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
 
-// Handle preflight requests
-app.options('*', cors());
+// Handle preflight requests for all routes
+app.use((req, res, next) => {
+	if (req.method === 'OPTIONS') {
+		res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+		res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+		res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+		res.header('Access-Control-Allow-Credentials', 'true');
+		return res.sendStatus(200);
+	}
+	next();
+});
 
 app.use(helmet({
 	crossOriginResourcePolicy: { policy: 'cross-origin' },
