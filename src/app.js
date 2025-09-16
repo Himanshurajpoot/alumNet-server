@@ -24,6 +24,14 @@ const limiter = rateLimit({
 	message: 'Too many requests from this IP, please try again later.',
 	standardHeaders: true,
 	legacyHeaders: false,
+	skip: (req) => req.method === 'OPTIONS',
+	handler: (req, res) => {
+		// Ensure CORS headers present even when rate limited
+		const origin = req.headers.origin || '*';
+		res.header('Access-Control-Allow-Origin', origin);
+		res.header('Access-Control-Allow-Credentials', 'true');
+		res.status(429).json({ message: 'Too many requests from this IP, please try again later.' });
+	},
 });
 
 const authLimiter = rateLimit({
@@ -32,6 +40,13 @@ const authLimiter = rateLimit({
 	message: 'Too many authentication attempts, please try again later.',
 	standardHeaders: true,
 	legacyHeaders: false,
+	skip: (req) => req.method === 'OPTIONS',
+	handler: (req, res) => {
+		const origin = req.headers.origin || '*';
+		res.header('Access-Control-Allow-Origin', origin);
+		res.header('Access-Control-Allow-Credentials', 'true');
+		res.status(429).json({ message: 'Too many authentication attempts, please try again later.' });
+	},
 });
 
 app.use(limiter);
